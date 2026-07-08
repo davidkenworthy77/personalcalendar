@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   addDays,
@@ -25,7 +25,6 @@ import type {
   EventItem,
   Holder,
 } from "@/lib/types";
-import { createClient } from "@/lib/supabase/client";
 import { MonthView } from "./MonthView";
 import { StripsView } from "./StripsView";
 import { YearView } from "./YearView";
@@ -77,7 +76,6 @@ export function CalendarApp({
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [swapBlock, setSwapBlock] = useState<CustodyBlock | null>(null);
   const [dayPopover, setDayPopover] = useState<YMD | null>(null);
-  const supabase = useRef(readOnly ? null : createClient());
 
   const categoriesById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -127,7 +125,16 @@ export function CalendarApp({
     setAnchor(startOfMonth(today()));
   }
 
-  // ----- event CRUD (optimistic) -----
+  // ----- event CRUD (optimistic; writes go through the key-gated API) -----
+  const mutate = (payload: Record<string, unknown>) =>
+    sandbox
+      ? Promise.resolve(null)
+      : fetch("/api/mutate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).then((r) => (r.ok ? r.json() : null));
+
   async function saveEvent(values: {
     id?: string;
     title: string;
@@ -148,17 +155,13 @@ export function CalendarApp({
     setDraft(null);
     if (values.id) {
       setEvents((es) => es.map((e) => (e.id === values.id ? { ...e, ...row } : e)));
-      await supabase.current!.from("events").update(row).eq("id", values.id);
+      await mutate({ kind: "event.save", event: { id: values.id, ...row } });
     } else {
       const tempId = `temp-${Math.random().toString(36).slice(2)}`;
       setEvents((es) => [...es, { id: tempId, ...row }]);
-      const { data } = await supabase
-        .current!.from("events")
-        .insert(row)
-        .select("id")
-        .single();
-      if (data) {
-        setEvents((es) => es.map((e) => (e.id === tempId ? { ...e, id: data.id } : e)));
+      const result = await mutate({ kind: "event.save", event: row });
+      if (result?.id) {
+        setEvents((es) => es.map((e) => (e.id === tempId ? { ...e, id: result.id } : e)));
       }
     }
   }
@@ -166,7 +169,7 @@ export function CalendarApp({
   async function deleteEvent(id: string) {
     setDraft(null);
     setEvents((es) => es.filter((e) => e.id !== id));
-    await supabase.current!.from("events").delete().eq("id", id);
+    await mutate({ kind: "event.delete", id });
   }
 
   // ----- custody swap -----
@@ -177,10 +180,7 @@ export function CalendarApp({
     if (newHolder === block.patternHolder) {
       // Swapping back to what the pattern says = just remove the override.
       setOverrides((os) => os.filter((o) => o.occurrence_start !== block.start));
-      await supabase
-        .current!.from("custody_overrides")
-        .delete()
-        .eq("occurrence_start", block.start);
+      await mutate({ kind: "override.delete", occurrence_start: block.start });
     } else {
       const override: CustodyOverride = {
         occurrence_start: block.start,
@@ -191,9 +191,12 @@ export function CalendarApp({
         ...os.filter((o) => o.occurrence_start !== block.start),
         override,
       ]);
-      await supabase
-        .current!.from("custody_overrides")
-        .upsert(override, { onConflict: "occurrence_start" });
+      await mutate({
+        kind: "override.set",
+        occurrence_start: block.start,
+        holder: newHolder,
+        note: note || null,
+      });
     }
   }
 

@@ -17,8 +17,12 @@ Year zoom. Day-granularity only; a bar shows its full title or no text at all
   anonymous key can call — it returns the custody schedule in full and all
   other events as anonymous date ranges. Titles and notes never leave the
   database.
-- **Auth**: magic-link email for the owner only; row-level security pins every
-  table to the owner's email, and the anon role has zero table access.
+- **Access**: no login. A secret bookmark URL (`/unlock/<EDIT_KEY>`) sets a
+  long-lived cookie; middleware gates everything except `/share/*` on it. All
+  reads/writes go through server API routes calling key-validated
+  `security definer` functions — the anon role has zero table access and the
+  database credential never ships to a browser. Env vars:
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `EDIT_KEY`.
 
 ## Development
 

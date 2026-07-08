@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { addDays, formatShort, today, weekdayMon0, type YMD } from "@/lib/dates";
 import { getCustodyBlocks, holderOn } from "@/lib/custody";
 import type { Category, CustodyPattern, CycleSegment, Holder } from "@/lib/types";
-import { createClient } from "@/lib/supabase/client";
+
+const mutate = (payload: Record<string, unknown>) =>
+  fetch("/api/mutate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then((r) => (r.ok ? r.json() : null));
 
 interface SettingsFormProps {
   categories: Category[];
@@ -51,7 +57,6 @@ const PRESETS: { label: string; anchor: () => YMD; cycle: CycleSegment[] }[] = [
 
 export function SettingsForm({ categories, pattern, activeToken, overrideCount }: SettingsFormProps) {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
 
   const [anchor, setAnchor] = useState<YMD>(pattern?.anchor_date ?? lastMonday());
   const [cycle, setCycle] = useState<CycleSegment[]>(
@@ -110,12 +115,12 @@ export function SettingsForm({ categories, pattern, activeToken, overrideCount }
       return;
     }
     setSaving(true);
-    if (overrideCount > 0) {
-      await supabase.from("custody_overrides").delete().gte("occurrence_start", "0001-01-01");
-    }
-    await supabase
-      .from("custody_pattern")
-      .upsert({ id: 1, anchor_date: anchor, cycle }, { onConflict: "id" });
+    await mutate({
+      kind: "pattern.save",
+      anchor_date: anchor,
+      cycle,
+      clear_overrides: overrideCount > 0,
+    });
     setSaving(false);
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2000);
@@ -129,8 +134,8 @@ export function SettingsForm({ categories, pattern, activeToken, overrideCount }
     ) {
       return;
     }
-    const { data } = await supabase.rpc("rotate_share_token");
-    if (data) setToken(data as string);
+    const result = await mutate({ kind: "token.rotate" });
+    if (result?.token) setToken(result.token as string);
   }
 
   async function copyLink() {
@@ -141,26 +146,13 @@ export function SettingsForm({ categories, pattern, activeToken, overrideCount }
   }
 
   async function saveCategory(cat: Category) {
-    await supabase
-      .from("categories")
-      .update({ name: cat.name, color: cat.color })
-      .eq("id", cat.id);
+    await mutate({ kind: "category.save", id: cat.id, name: cat.name, color: cat.color });
   }
 
   async function downloadBackup() {
-    const [events, pattern, overrides, categories] = await Promise.all([
-      supabase.from("events").select("title,category_id,start_date,end_date,notes"),
-      supabase.from("custody_pattern").select("anchor_date,cycle").eq("id", 1).maybeSingle(),
-      supabase.from("custody_overrides").select("occurrence_start,holder,note"),
-      supabase.from("categories").select("id,name,color,is_custody,holder,sort"),
-    ]);
-    const backup = {
-      exported_at: new Date().toISOString(),
-      events: events.data ?? [],
-      custody_pattern: pattern.data,
-      custody_overrides: overrides.data ?? [],
-      categories: categories.data ?? [],
-    };
+    const data = await fetch("/api/data").then((r) => (r.ok ? r.json() : null));
+    if (!data) return;
+    const backup = { exported_at: new Date().toISOString(), ...data };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -168,12 +160,6 @@ export function SettingsForm({ categories, pattern, activeToken, overrideCount }
     a.download = `glance-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
   }
 
   function setSegment(i: number, patch: Partial<CycleSegment>) {
@@ -420,12 +406,6 @@ export function SettingsForm({ categories, pattern, activeToken, overrideCount }
         </button>
       </section>
 
-      <button
-        onClick={signOut}
-        className="text-sm font-medium text-ink-soft hover:text-today transition"
-      >
-        Sign out
-      </button>
     </main>
   );
 }

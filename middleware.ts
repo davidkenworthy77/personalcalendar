@@ -1,56 +1,27 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/share", "/login", "/auth"];
+// No login: a secret bookmark URL (/unlock/<key>) sets a long-lived cookie,
+// and everything except the public surfaces requires it.
+const PUBLIC_PREFIXES = ["/share", "/unlock", "/locked"];
 if (process.env.NODE_ENV !== "production") PUBLIC_PREFIXES.push("/dev");
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // Refreshes the session if needed; do not run logic between client creation
-  // and getUser().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
-
-  if (!user && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
   }
-  if (user && pathname.startsWith("/login")) {
+  const key = request.cookies.get("glance_key")?.value;
+  if (!process.env.EDIT_KEY || key !== process.env.EDIT_KEY) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    url.pathname = "/locked";
+    // Rewrite (not redirect) so the URL bar keeps what the user typed.
+    return NextResponse.rewrite(url, { status: pathname.startsWith("/api") ? 401 : 200 });
   }
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Everything except static assets and images.
     "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
