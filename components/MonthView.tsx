@@ -2,22 +2,19 @@
 
 import { dayOfMonth, monthIndex, monthWeeks, today, WEEKDAY_SHORT } from "@/lib/dates";
 import { layoutSegments, laneCount, textFits } from "@/lib/layout";
-import type { Category, CustodyBlock, EventItem, Holder } from "@/lib/types";
+import type { Category, EventItem } from "@/lib/types";
 import { BUSY_COLOR, type ViewCallbacks } from "./CalendarApp";
 import { useDragCreate } from "./useDragCreate";
 import { BAR_FONT, useContainerWidth } from "./useContainerWidth";
 
 const LANE_H = 28;
-const BAND_H = 8;
-const DAY_NUM_H = 30;
+const DAY_NUM_H = 32;
 
 interface MonthViewProps {
   y: number;
   m0: number;
   events: EventItem[];
   categoriesById: Map<number, Category>;
-  custodyBlocks: CustodyBlock[];
-  custodyColor: (h: Holder) => string;
   readOnly: boolean;
   callbacks: ViewCallbacks;
 }
@@ -27,8 +24,6 @@ export function MonthView({
   m0,
   events,
   categoriesById,
-  custodyBlocks,
-  custodyColor,
   readOnly,
   callbacks,
 }: MonthViewProps) {
@@ -60,12 +55,7 @@ export function MonthView({
       {weeks.map((week) => {
         const segs = layoutSegments(events, week[0], week[6]);
         const lanes = laneCount(segs);
-        const height = Math.max(112, DAY_NUM_H + BAND_H + lanes * LANE_H + 8);
-        const custodySegs = layoutSegments(
-          custodyBlocks.map((b) => ({ start_date: b.start, end_date: b.end, block: b })),
-          week[0],
-          week[6]
-        );
+        const height = Math.max(112, DAY_NUM_H + lanes * LANE_H + 8);
 
         return (
           <div
@@ -103,32 +93,6 @@ export function MonthView({
               })}
             </div>
 
-            {/* custody band */}
-            {custodySegs.map((seg) => {
-              const b = (seg.item as { block: CustodyBlock }).block;
-              return (
-                <button
-                  key={`c-${seg.item.start_date}-${seg.col}`}
-                  data-bar
-                  disabled={readOnly}
-                  onClick={() => callbacks.onCustodyClick(b)}
-                  title={b.isSwapped ? "Swapped from the usual pattern" : undefined}
-                  className="absolute top-0 disabled:cursor-default cursor-pointer"
-                  style={{
-                    left: `${(seg.col / 7) * 100}%`,
-                    width: `${(seg.span / 7) * 100}%`,
-                    height: BAND_H,
-                    background: custodyColor(b.holder),
-                    opacity: 0.85,
-                  }}
-                >
-                  {b.isSwapped && (
-                    <span className="absolute inset-y-0 left-1 my-auto h-[4px] w-[4px] rounded-full bg-white/90" />
-                  )}
-                </button>
-              );
-            })}
-
             {/* event bars */}
             {segs.map((seg) => {
               const cat = categoriesById.get(seg.item.category_id);
@@ -157,7 +121,7 @@ export function MonthView({
                     style={{
                       left: `calc(${(seg.col / 7) * 100}% + 3px)`,
                       width: `calc(${(seg.span / 7) * 100}% - 6px)`,
-                      top: DAY_NUM_H + BAND_H + seg.lane * LANE_H,
+                      top: DAY_NUM_H + seg.lane * LANE_H,
                       height: LANE_H - 5,
                       background: color,
                       boxShadow: "0 1px 2px rgba(60,45,25,0.15)",
@@ -170,7 +134,7 @@ export function MonthView({
                       className="absolute flex items-center whitespace-nowrap text-[13px] font-medium text-ink-soft pointer-events-none"
                       style={{
                         left: `calc(${((seg.col + seg.span) / 7) * 100}% + 6px)`,
-                        top: DAY_NUM_H + BAND_H + seg.lane * LANE_H,
+                        top: DAY_NUM_H + seg.lane * LANE_H,
                         height: LANE_H - 5,
                       }}
                     >

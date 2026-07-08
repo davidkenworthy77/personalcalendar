@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  addDays,
   addMonths,
   endOfMonth,
   maxYMD,
@@ -16,20 +16,11 @@ import {
   year,
   type YMD,
 } from "@/lib/dates";
-import { getCustodyBlocks } from "@/lib/custody";
-import type {
-  Category,
-  CustodyBlock,
-  CustodyOverride,
-  CustodyPattern,
-  EventItem,
-  Holder,
-} from "@/lib/types";
+import type { Category, EventItem } from "@/lib/types";
 import { MonthView } from "./MonthView";
 import { StripsView } from "./StripsView";
 import { YearView } from "./YearView";
 import { EventDialog, type EventDraft } from "./EventDialog";
-import { SwapDialog } from "./SwapDialog";
 import { DayPopover } from "./DayPopover";
 import { Legend } from "./Legend";
 
@@ -43,14 +34,11 @@ export interface CalendarAppProps {
   sandbox?: boolean;
   categories: Category[];
   initialEvents: EventItem[];
-  pattern: CustodyPattern | null;
-  initialOverrides: CustodyOverride[];
 }
 
 export interface ViewCallbacks {
   onSelectRange: (start: YMD, end: YMD) => void;
   onEventClick: (event: EventItem) => void;
-  onCustodyClick: (block: CustodyBlock) => void;
   onDayClick: (day: YMD) => void;
 }
 
@@ -66,29 +54,16 @@ export function CalendarApp({
   sandbox = false,
   categories,
   initialEvents,
-  pattern,
-  initialOverrides,
 }: CalendarAppProps) {
+  const router = useRouter();
   const [view, setView] = useState<ViewKind>(readOnly ? "3mo" : "month");
   const [anchor, setAnchor] = useState<YMD>(startOfMonth(today()));
   const [events, setEvents] = useState<EventItem[]>(initialEvents);
-  const [overrides, setOverrides] = useState<CustodyOverride[]>(initialOverrides);
   const [draft, setDraft] = useState<EventDraft | null>(null);
-  const [swapBlock, setSwapBlock] = useState<CustodyBlock | null>(null);
   const [dayPopover, setDayPopover] = useState<YMD | null>(null);
 
   const categoriesById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
-    [categories]
-  );
-  const custodyColor = useCallback(
-    (holder: Holder) =>
-      categories.find((c) => c.is_custody && c.holder === holder)?.color ?? "#888",
-    [categories]
-  );
-  const custodyName = useCallback(
-    (holder: Holder) =>
-      categories.find((c) => c.is_custody && c.holder === holder)?.name ?? holder,
     [categories]
   );
 
@@ -110,12 +85,6 @@ export function CalendarApp({
     return list;
   }, [rangeStart, rangeEnd]);
 
-  const custodyBlocks = useMemo(() => {
-    if (!pattern) return [];
-    // Buffer a week each side so week rows at the edges get their bands.
-    return getCustodyBlocks(pattern, overrides, addDays(rangeStart, -7), addDays(rangeEnd, 7));
-  }, [pattern, overrides, rangeStart, rangeEnd]);
-
   // ----- navigation -----
   function page(dir: -1 | 1) {
     const step = view === "year" ? 12 : view === "month" ? 1 : viewMonths;
@@ -125,15 +94,25 @@ export function CalendarApp({
     setAnchor(startOfMonth(today()));
   }
 
-  // ----- event CRUD (optimistic; writes go through the key-gated API) -----
-  const mutate = (payload: Record<string, unknown>) =>
-    sandbox
-      ? Promise.resolve(null)
-      : fetch("/api/mutate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }).then((r) => (r.ok ? r.json() : null));
+  // ----- event CRUD (optimistic, but failures are loud and resync) -----
+  async function mutate(payload: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+    if (sandbox) return null;
+    try {
+      const res = await fetch("/api/mutate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`save failed (${res.status})`);
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      alert("That change didn't save — reloading to show what's really stored.");
+      router.refresh();
+      window.location.reload();
+      return null;
+    }
+  }
 
   async function saveEvent(values: {
     id?: string;
@@ -161,7 +140,9 @@ export function CalendarApp({
       setEvents((es) => [...es, { id: tempId, ...row }]);
       const result = await mutate({ kind: "event.save", event: row });
       if (result?.id) {
-        setEvents((es) => es.map((e) => (e.id === tempId ? { ...e, id: result.id } : e)));
+        setEvents((es) =>
+          es.map((e) => (e.id === tempId ? { ...e, id: result.id as string } : e))
+        );
       }
     }
   }
@@ -169,34 +150,8 @@ export function CalendarApp({
   async function deleteEvent(id: string) {
     setDraft(null);
     setEvents((es) => es.filter((e) => e.id !== id));
-    await mutate({ kind: "event.delete", id });
-  }
-
-  // ----- custody swap -----
-  async function swap(block: CustodyBlock, note: string) {
-    setSwapBlock(null);
-    setDayPopover(null);
-    const newHolder: Holder = block.holder === "me" ? "coparent" : "me";
-    if (newHolder === block.patternHolder) {
-      // Swapping back to what the pattern says = just remove the override.
-      setOverrides((os) => os.filter((o) => o.occurrence_start !== block.start));
-      await mutate({ kind: "override.delete", occurrence_start: block.start });
-    } else {
-      const override: CustodyOverride = {
-        occurrence_start: block.start,
-        holder: newHolder,
-        note: note || null,
-      };
-      setOverrides((os) => [
-        ...os.filter((o) => o.occurrence_start !== block.start),
-        override,
-      ]);
-      await mutate({
-        kind: "override.set",
-        occurrence_start: block.start,
-        holder: newHolder,
-        note: note || null,
-      });
+    if (!id.startsWith("temp-")) {
+      await mutate({ kind: "event.delete", id });
     }
   }
 
@@ -209,10 +164,6 @@ export function CalendarApp({
     onEventClick: (event) => {
       if (readOnly || event.id.startsWith("busy-")) return;
       setDraft({ ...event, notes: event.notes ?? "" });
-    },
-    onCustodyClick: (block) => {
-      if (readOnly) return;
-      setSwapBlock(block);
     },
     onDayClick: (day) => setDayPopover(day),
   };
@@ -302,8 +253,6 @@ export function CalendarApp({
             m0={monthIndex(anchor)}
             events={events}
             categoriesById={categoriesById}
-            custodyBlocks={custodyBlocks}
-            custodyColor={custodyColor}
             readOnly={readOnly}
             callbacks={callbacks}
           />
@@ -314,8 +263,6 @@ export function CalendarApp({
             dense={view === "6mo"}
             events={events}
             categoriesById={categoriesById}
-            custodyBlocks={custodyBlocks}
-            custodyColor={custodyColor}
             readOnly={readOnly}
             callbacks={callbacks}
           />
@@ -325,8 +272,6 @@ export function CalendarApp({
             months={months}
             events={events}
             categoriesById={categoriesById}
-            custodyBlocks={custodyBlocks}
-            custodyColor={custodyColor}
             callbacks={callbacks}
           />
         )}
@@ -336,19 +281,10 @@ export function CalendarApp({
       {draft && (
         <EventDialog
           draft={draft}
-          categories={categories.filter((c) => !c.is_custody)}
+          categories={categories}
           onSave={saveEvent}
           onDelete={deleteEvent}
           onClose={() => setDraft(null)}
-        />
-      )}
-      {swapBlock && (
-        <SwapDialog
-          block={swapBlock}
-          custodyName={custodyName}
-          custodyColor={custodyColor}
-          onSwap={swap}
-          onClose={() => setSwapBlock(null)}
         />
       )}
       {dayPopover && (
@@ -356,9 +292,6 @@ export function CalendarApp({
           day={dayPopover}
           events={events}
           categoriesById={categoriesById}
-          custodyBlocks={custodyBlocks}
-          custodyColor={custodyColor}
-          custodyName={custodyName}
           readOnly={readOnly}
           onAdd={() => {
             const d = dayPopover;
@@ -368,10 +301,6 @@ export function CalendarApp({
           onEdit={(e) => {
             setDayPopover(null);
             callbacks.onEventClick(e);
-          }}
-          onSwap={(b) => {
-            setDayPopover(null);
-            setSwapBlock(b);
           }}
           onClose={() => setDayPopover(null)}
         />

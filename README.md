@@ -8,15 +8,13 @@ Year zoom. Day-granularity only; a bar shows its full title or no text at all
 ## How it works
 
 - **Next.js (App Router) + Supabase + Tailwind**, deployed on Vercel.
-- **Custody is computed, never stored**: [lib/custody.ts](lib/custody.ts) walks
-  the repeating pattern (`custody_pattern`) from its anchor date and applies
-  one-row-per-swap overrides (`custody_overrides`). Click any custody band on
-  the calendar to swap a block; click a swapped block to revert.
+- **Everything is an event**: drag across days, give it a title and a color.
+  Colors (categories) are managed in Settings — add, rename, recolor, delete.
+  The two "shared" colors are the Holly (dog) schedule.
 - **Share link** (`/share/<token>`): read-only for the dog co-parent. The
-  `share_view` Postgres function (security definer) is the only thing the
-  anonymous key can call — it returns the custody schedule in full and all
-  other events as anonymous date ranges. Titles and notes never leave the
-  database.
+  `share_view` Postgres function (security definer) returns events in the two
+  shared colors in full and all other events as anonymous "Busy" date ranges.
+  Titles and notes of private events never leave the database.
 - **Access**: no login. A secret bookmark URL (`/unlock/<EDIT_KEY>`) sets a
   long-lived cookie; middleware gates everything except `/share/*` on it. All
   reads/writes go through server API routes calling key-validated
@@ -27,8 +25,7 @@ Year zoom. Day-granularity only; a bar shows its full title or no text at all
 ## Development
 
 ```bash
-npm run dev                     # local dev (uses .env.local)
-npx tsx tests/custody.test.ts   # custody engine unit tests
+npm run dev   # local dev (uses .env.local)
 ```
 
 `/dev` is a UI sandbox with fixture data and no auth — it 404s in production.
@@ -38,7 +35,8 @@ via the Supabase MCP; kept in-repo as the record).
 
 ## Settings (`/settings`)
 
-- Edit the custody pattern (presets + custom cycle) with a live 8-week preview.
-  Changing the pattern clears existing swaps (they belong to old block dates).
+- Manage colors: add, rename, recolor, delete (deleting is blocked while
+  events still use the color). The two "shared" colors can't be deleted —
+  they're what Harriet's link shows in full.
 - Create/rotate the share link. Rotating deactivates the old link instantly.
-- Rename categories and change their colors.
+- Download all data as JSON.

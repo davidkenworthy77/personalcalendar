@@ -2,7 +2,7 @@
 
 import { daysInMonth, MONTH_SHORT, monthDays, today, weekdayMon0 } from "@/lib/dates";
 import { layoutSegments, laneCount, textFits } from "@/lib/layout";
-import type { Category, CustodyBlock, EventItem, Holder } from "@/lib/types";
+import type { Category, EventItem } from "@/lib/types";
 import { BUSY_COLOR, type ViewCallbacks } from "./CalendarApp";
 import { BAR_FONT, useContainerWidth } from "./useContainerWidth";
 
@@ -15,24 +15,15 @@ interface YearViewProps {
   months: { y: number; m0: number }[];
   events: EventItem[];
   categoriesById: Map<number, Category>;
-  custodyBlocks: CustodyBlock[];
-  custodyColor: (h: Holder) => string;
   callbacks: ViewCallbacks;
 }
 
 /**
- * Wall-planner: 12 month rows × 31 day columns. Custody as a soft tint,
- * events as labeled bars (full title where it fits, plain color otherwise).
+ * Wall-planner: 12 month rows × 31 day columns. Events as labeled bars
+ * (full title where it fits, spill-over beside the bar otherwise).
  * Tap a day for full detail.
  */
-export function YearView({
-  months,
-  events,
-  categoriesById,
-  custodyBlocks,
-  custodyColor,
-  callbacks,
-}: YearViewProps) {
+export function YearView({ months, events, categoriesById, callbacks }: YearViewProps) {
   const todayYMD = today();
   const { ref, width } = useContainerWidth<HTMLDivElement>();
   const dayPx = width / 31;
@@ -58,16 +49,9 @@ export function YearView({
         {months.map(({ y, m0 }, monthIdx) => {
           const n = daysInMonth(y, m0);
           const days = monthDays(y, m0);
-          const first = days[0];
-          const last = days[n - 1];
-          const segs = layoutSegments(events, first, last);
+          const segs = layoutSegments(events, days[0], days[n - 1]);
           const lanes = Math.min(MAX_LANES, Math.max(1, laneCount(segs)));
           const rowHeight = 8 + lanes * LANE_H + 6;
-          const custodySegs = layoutSegments(
-            custodyBlocks.map((b) => ({ start_date: b.start, end_date: b.end, block: b })),
-            first,
-            last
-          );
 
           return (
             <div key={m0} className="flex border-b border-hairline last:border-b-0">
@@ -82,23 +66,6 @@ export function YearView({
                 className="relative flex-1"
                 style={{ height: rowHeight }}
               >
-                {/* custody tint per block segment */}
-                {custodySegs.map((seg) => {
-                  const b = (seg.item as { block: CustodyBlock }).block;
-                  return (
-                    <div
-                      key={`c-${seg.item.start_date}-${seg.col}`}
-                      className="absolute inset-y-0 pointer-events-none"
-                      style={{
-                        left: `${(seg.col / 31) * 100}%`,
-                        width: `${(seg.span / 31) * 100}%`,
-                        background: custodyColor(b.holder),
-                        opacity: 0.18,
-                      }}
-                    />
-                  );
-                })}
-
                 {/* event bars, labeled where the title fits */}
                 {segs
                   .filter((s) => s.lane < MAX_LANES)
@@ -174,9 +141,7 @@ export function YearView({
                         className={`border-r border-hairline/50 last:border-r-0 transition hover:bg-ink/[0.06] ${
                           isWeekend ? "bg-ink/[0.04]" : ""
                         } ${
-                          isToday
-                            ? "outline outline-2 -outline-offset-2 outline-today z-10"
-                            : ""
+                          isToday ? "outline outline-2 -outline-offset-2 outline-today z-10" : ""
                         }`}
                         aria-label={day}
                       />

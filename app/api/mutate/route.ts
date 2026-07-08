@@ -32,34 +32,6 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
         return NextResponse.json({ ok: true });
       }
-      case "override.set": {
-        const { error } = await supabase.rpc("set_override", {
-          edit_key: key,
-          p_start: body.occurrence_start,
-          p_holder: body.holder,
-          p_note: body.note ?? null,
-        });
-        if (error) throw error;
-        return NextResponse.json({ ok: true });
-      }
-      case "override.delete": {
-        const { error } = await supabase.rpc("delete_override", {
-          edit_key: key,
-          p_start: body.occurrence_start,
-        });
-        if (error) throw error;
-        return NextResponse.json({ ok: true });
-      }
-      case "pattern.save": {
-        const { error } = await supabase.rpc("save_pattern", {
-          edit_key: key,
-          p_anchor: body.anchor_date,
-          p_cycle: body.cycle,
-          p_clear_overrides: Boolean(body.clear_overrides),
-        });
-        if (error) throw error;
-        return NextResponse.json({ ok: true });
-      }
       case "category.save": {
         const { error } = await supabase.rpc("save_category", {
           edit_key: key,
@@ -68,6 +40,29 @@ export async function POST(request: NextRequest) {
           p_color: body.color,
         });
         if (error) throw error;
+        return NextResponse.json({ ok: true });
+      }
+      case "category.add": {
+        const { data, error } = await supabase.rpc("add_category", {
+          edit_key: key,
+          p_name: body.name,
+          p_color: body.color,
+        });
+        if (error) throw error;
+        return NextResponse.json(data);
+      }
+      case "category.delete": {
+        const { error } = await supabase.rpc("delete_category", {
+          edit_key: key,
+          p_id: body.id,
+        });
+        if (error) {
+          const inUse = String(error.message).includes("category in use");
+          return NextResponse.json(
+            { error: inUse ? "category in use" : "mutation failed" },
+            { status: inUse ? 409 : 500 }
+          );
+        }
         return NextResponse.json({ ok: true });
       }
       case "token.rotate": {

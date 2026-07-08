@@ -1,21 +1,16 @@
 "use client";
 
 import { formatMedium, formatRange, rangesOverlap, type YMD } from "@/lib/dates";
-import { holderOn } from "@/lib/custody";
-import type { Category, CustodyBlock, EventItem, Holder } from "@/lib/types";
+import type { Category, EventItem } from "@/lib/types";
 import { BUSY_COLOR } from "./CalendarApp";
 
 interface DayPopoverProps {
   day: YMD;
   events: EventItem[];
   categoriesById: Map<number, Category>;
-  custodyBlocks: CustodyBlock[];
-  custodyColor: (h: Holder) => string;
-  custodyName: (h: Holder) => string;
   readOnly: boolean;
   onAdd: () => void;
   onEdit: (e: EventItem) => void;
-  onSwap: (b: CustodyBlock) => void;
   onClose: () => void;
 }
 
@@ -23,16 +18,11 @@ export function DayPopover({
   day,
   events,
   categoriesById,
-  custodyBlocks,
-  custodyColor,
-  custodyName,
   readOnly,
   onAdd,
   onEdit,
-  onSwap,
   onClose,
 }: DayPopoverProps) {
-  const block = holderOn(custodyBlocks, day);
   const dayEvents = events.filter((e) =>
     rangesOverlap(e.start_date, e.end_date, day, day)
   );
@@ -47,24 +37,6 @@ export function DayPopover({
         className="pop-in w-full sm:max-w-sm bg-paper-raised rounded-t-2xl sm:rounded-2xl border border-hairline shadow-[var(--shadow-pop)] p-5 space-y-4"
       >
         <h2 className="font-display text-xl font-semibold">{formatMedium(day)}</h2>
-
-        {block && (
-          <button
-            disabled={readOnly}
-            onClick={() => onSwap(block)}
-            className="w-full flex items-center gap-3 rounded-xl border border-hairline bg-paper px-4 py-3 text-left transition enabled:hover:border-hairline-strong disabled:cursor-default"
-          >
-            <span className="h-3 w-3 rounded-full shrink-0" style={{ background: custodyColor(block.holder) }} />
-            <span className="flex-1">
-              <span className="block text-sm font-semibold">{custodyName(block.holder)}</span>
-              <span className="block text-xs text-ink-soft">
-                {formatRange(block.start, block.end)}
-                {block.isSwapped ? " · swapped" : ""}
-              </span>
-            </span>
-            {!readOnly && <span className="text-xs text-ink-faint">swap ↔</span>}
-          </button>
-        )}
 
         {dayEvents.length === 0 ? (
           <p className="text-sm text-ink-faint">Nothing planned.</p>

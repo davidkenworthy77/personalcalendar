@@ -2,7 +2,7 @@
 
 import { daysInMonth, MONTH_NAMES, monthDays, today, weekdayMon0 } from "@/lib/dates";
 import { layoutSegments, laneCount, textFits } from "@/lib/layout";
-import type { Category, CustodyBlock, EventItem, Holder } from "@/lib/types";
+import type { Category, EventItem } from "@/lib/types";
 import { BUSY_COLOR, type ViewCallbacks } from "./CalendarApp";
 import { useDragCreate } from "./useDragCreate";
 import { BAR_FONT, useContainerWidth } from "./useContainerWidth";
@@ -12,8 +12,6 @@ interface StripsViewProps {
   dense: boolean; // 6-month = dense
   events: EventItem[];
   categoriesById: Map<number, Category>;
-  custodyBlocks: CustodyBlock[];
-  custodyColor: (h: Holder) => string;
   readOnly: boolean;
   callbacks: ViewCallbacks;
 }
@@ -23,8 +21,6 @@ export function StripsView({
   dense,
   events,
   categoriesById,
-  custodyBlocks,
-  custodyColor,
   readOnly,
   callbacks,
 }: StripsViewProps) {
@@ -33,7 +29,6 @@ export function StripsView({
   const todayYMD = today();
 
   const LANE_H = dense ? 19 : 26;
-  const BAND_H = dense ? 6 : 8;
   const NUM_H = dense ? 18 : 22;
   const fontPx = dense ? 10.5 : 12.5;
 
@@ -46,13 +41,8 @@ export function StripsView({
         const last = days[n - 1];
         const segs = layoutSegments(events, first, last);
         const lanes = Math.max(1, laneCount(segs));
-        const custodySegs = layoutSegments(
-          custodyBlocks.map((b) => ({ start_date: b.start, end_date: b.end, block: b })),
-          first,
-          last
-        );
         // width is measured on the grid area itself (label column excluded)
-        const stripHeight = BAND_H + NUM_H + lanes * LANE_H + 8;
+        const stripHeight = NUM_H + lanes * LANE_H + 8;
         const dayPx = width / n;
 
         return (
@@ -67,7 +57,11 @@ export function StripsView({
               <div className="text-xs text-ink-faint">{y}</div>
             </div>
 
-            <div ref={months[0].y === y && months[0].m0 === m0 ? ref : undefined} className="relative flex-1" style={{ height: stripHeight }}>
+            <div
+              ref={months[0].y === y && months[0].m0 === m0 ? ref : undefined}
+              className="relative flex-1"
+              style={{ height: stripHeight }}
+            >
               {/* day cells */}
               <div
                 className="absolute inset-0 grid"
@@ -95,10 +89,9 @@ export function StripsView({
                     >
                       {showNum && (
                         <span
-                          className={`absolute left-1/2 -translate-x-1/2 text-[10px] tabular-nums ${
+                          className={`absolute left-1/2 -translate-x-1/2 top-[3px] text-[10px] tabular-nums ${
                             isToday ? "font-bold text-today" : "text-ink-faint"
                           }`}
-                          style={{ top: BAND_H + 3 }}
                         >
                           {dom}
                         </span>
@@ -107,31 +100,6 @@ export function StripsView({
                   );
                 })}
               </div>
-
-              {/* custody band */}
-              {custodySegs.map((seg) => {
-                const b = (seg.item as { block: CustodyBlock }).block;
-                return (
-                  <button
-                    key={`c-${seg.item.start_date}-${seg.col}`}
-                    data-bar
-                    disabled={readOnly}
-                    onClick={() => callbacks.onCustodyClick(b)}
-                    className="absolute top-0 disabled:cursor-default cursor-pointer"
-                    style={{
-                      left: `${(seg.col / n) * 100}%`,
-                      width: `${(seg.span / n) * 100}%`,
-                      height: BAND_H,
-                      background: custodyColor(b.holder),
-                      opacity: 0.85,
-                    }}
-                  >
-                    {b.isSwapped && (
-                      <span className="absolute inset-y-0 left-1 my-auto h-[4px] w-[4px] rounded-full bg-white/90" />
-                    )}
-                  </button>
-                );
-              })}
 
               {/* event bars */}
               {segs.map((seg) => {
@@ -157,7 +125,7 @@ export function StripsView({
                       style={{
                         left: `calc(${(seg.col / n) * 100}% + 2px)`,
                         width: `calc(${(seg.span / n) * 100}% - 4px)`,
-                        top: BAND_H + NUM_H + seg.lane * LANE_H,
+                        top: NUM_H + seg.lane * LANE_H,
                         height: LANE_H - 4,
                         background: color,
                         fontSize: fontPx,
@@ -171,7 +139,7 @@ export function StripsView({
                         className="absolute flex items-center whitespace-nowrap font-medium text-ink-soft pointer-events-none"
                         style={{
                           left: `calc(${((seg.col + seg.span) / n) * 100}% + 5px)`,
-                          top: BAND_H + NUM_H + seg.lane * LANE_H,
+                          top: NUM_H + seg.lane * LANE_H,
                           height: LANE_H - 4,
                           fontSize: fontPx,
                         }}

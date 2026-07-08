@@ -1,0 +1,20 @@
+-- Applied to project ddxvblfgkqkpowolgltr via Supabase MCP (events_only_model).
+--
+-- The custody pattern/override system is removed: everything is a plain event
+-- with a color category. The existing monthly pattern (anchor 2026-06-24,
+-- David first, swap on the 24th) was converted into 12 months of "Holly"
+-- events (category 1 = Holly: David, category 2 = Holly: Harriet) covering
+-- 2026-06-24 → 2027-06-23.
+--
+-- Dropped: custody_pattern, custody_overrides tables; save_pattern,
+-- set_override, delete_override functions; categories.holder column.
+--
+-- Added (security definer, edit-key-validated, granted to anon):
+--   add_category(edit_key, p_name, p_color) -> {id, sort}
+--   delete_category(edit_key, p_id)         -- raises 'category in use' if events reference it
+--
+-- Rewritten:
+--   get_owner_data(edit_key) -> {categories, events, active_token}
+--   share_view(share_token)  -> {categories (is_custody only), shown, busy}
+--     • events in is_custody categories appear in full (the Holly schedule)
+--     • all other events are anonymous {start_date, end_date} busy ranges
