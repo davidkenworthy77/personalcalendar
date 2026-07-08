@@ -1,26 +1,86 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Paper & ink */
+  --paper: #faf6ef;
+  --paper-raised: #ffffff;
+  --paper-sunken: #f3ecdf;
+  --ink: #211a15;
+  --ink-soft: #5f554c;
+  --ink-faint: #9b8f83;
+  --hairline: #e6dccc;
+  --hairline-strong: #d5c8b2;
+  --today: #c2410c;
+  --busy: #a8a29e;
+  --shadow-soft: 0 1px 2px rgba(60, 45, 25, 0.06), 0 8px 24px -12px rgba(60, 45, 25, 0.25);
+  --shadow-pop: 0 2px 6px rgba(60, 45, 25, 0.1), 0 16px 40px -12px rgba(60, 45, 25, 0.35);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-paper-sunken: var(--paper-sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-today: var(--today);
+  --color-busy: var(--busy);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  /* faint paper grain */
+  background-image: radial-gradient(rgba(60, 45, 25, 0.028) 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+
+::selection {
+  background: rgba(194, 65, 12, 0.18);
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+/* Prevent page scroll-bounce fighting drag-to-create on touch. */
+.calendar-surface {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pop-in {
+  animation: pop-in 0.18s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
