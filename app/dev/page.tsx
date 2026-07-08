@@ -16,6 +16,7 @@ export default function DevSandbox() {
 
   return (
     <CalendarApp
+      sandbox
       categories={categories}
       initialEvents={[
         { id: "e1", title: "Hawaii vacation", category_id: 4, start_date: "2026-08-10", end_date: "2026-08-21", notes: null },

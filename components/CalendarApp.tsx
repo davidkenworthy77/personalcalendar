@@ -40,6 +40,8 @@ export const BUSY_COLOR = "#a8a29e";
 
 export interface CalendarAppProps {
   readOnly?: boolean;
+  /** Dev fixture mode: no auth, no DB — hides links that need a session. */
+  sandbox?: boolean;
   categories: Category[];
   initialEvents: EventItem[];
   pattern: CustodyPattern | null;
@@ -62,6 +64,7 @@ const VIEWS: { key: ViewKind; label: string; months: number }[] = [
 
 export function CalendarApp({
   readOnly = false,
+  sandbox = false,
   categories,
   initialEvents,
   pattern,
@@ -270,7 +273,7 @@ export function CalendarApp({
           ))}
         </div>
 
-        {!readOnly && (
+        {!readOnly && !sandbox && (
           <Link
             href="/settings"
             aria-label="Settings"
@@ -278,6 +281,11 @@ export function CalendarApp({
           >
             ⚙
           </Link>
+        )}
+        {sandbox && (
+          <span className="h-9 px-3 rounded-lg bg-paper-sunken border border-hairline grid place-items-center text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            Sandbox
+          </span>
         )}
       </header>
 
