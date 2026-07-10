@@ -56,7 +56,7 @@ export function CalendarApp({
   initialEvents,
 }: CalendarAppProps) {
   const router = useRouter();
-  const [view, setView] = useState<ViewKind>(readOnly ? "3mo" : "month");
+  const [view, setView] = useState<ViewKind>(readOnly ? "3mo" : "6mo");
   const [anchor, setAnchor] = useState<YMD>(startOfMonth(today()));
   const [events, setEvents] = useState<EventItem[]>(initialEvents);
   const [draft, setDraft] = useState<EventDraft | null>(null);
