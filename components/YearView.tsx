@@ -55,10 +55,13 @@ export function YearView({ months, events, categoriesById, callbacks }: YearView
 
           return (
             <div key={m0} className="flex border-b border-hairline last:border-b-0">
-              <div className="w-12 shrink-0 grid place-items-center border-r border-hairline bg-paper-sunken/40">
-                <span className="font-display text-[13px] font-semibold text-ink-soft">
+              <div className="w-12 shrink-0 grid place-items-center content-center border-r border-hairline bg-paper-sunken/40">
+                <span className="font-display text-[13px] font-semibold text-ink-soft leading-none">
                   {MONTH_SHORT[m0]}
                 </span>
+                {(monthIdx === 0 || m0 === 0) && (
+                  <span className="text-[9px] text-ink-faint leading-tight">{y}</span>
+                )}
               </div>
 
               <div

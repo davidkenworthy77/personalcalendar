@@ -67,13 +67,10 @@ export function CalendarApp({
     [categories]
   );
 
-  // Visible range
+  // Visible range — every view is a rolling window from the anchor month.
   const viewMonths = VIEWS.find((v) => v.key === view)!.months;
-  const rangeStart = view === "year" ? `${year(anchor)}-01-01` : anchor;
-  const rangeEnd =
-    view === "year"
-      ? `${year(anchor)}-12-31`
-      : endOfMonth(addMonths(anchor, viewMonths - 1));
+  const rangeStart = anchor;
+  const rangeEnd = endOfMonth(addMonths(anchor, viewMonths - 1));
 
   const months = useMemo(() => {
     const list: { y: number; m0: number }[] = [];
@@ -169,11 +166,11 @@ export function CalendarApp({
   };
 
   const title =
-    view === "year"
-      ? `${year(anchor)}`
-      : view === "month"
-        ? `${MONTH_NAMES[monthIndex(anchor)]} ${year(anchor)}`
-        : `${MONTH_SHORT[monthIndex(anchor)]} – ${MONTH_SHORT[monthIndex(rangeEnd)]} ${year(rangeEnd)}`;
+    view === "month"
+      ? `${MONTH_NAMES[monthIndex(anchor)]} ${year(anchor)}`
+      : year(anchor) === year(rangeEnd)
+        ? `${MONTH_SHORT[monthIndex(anchor)]} – ${MONTH_SHORT[monthIndex(rangeEnd)]} ${year(rangeEnd)}`
+        : `${MONTH_SHORT[monthIndex(anchor)]} ${year(anchor)} – ${MONTH_SHORT[monthIndex(rangeEnd)]} ${year(rangeEnd)}`;
 
   return (
     <div className="flex-1 flex flex-col max-w-[1400px] w-full mx-auto px-3 sm:px-6 pb-10">
