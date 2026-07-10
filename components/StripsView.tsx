@@ -65,7 +65,7 @@ export function StripsView({
             </div>
 
             <div ref={monthIdx === 0 ? ref : undefined} className="flex-1">
-              {lines.map((lineDays, li) => {
+              {lines.map((lineDays) => {
                 const lineStart = lineDays[0];
                 const lineEnd = lineDays[lineDays.length - 1];
                 const segs = layoutSegments(events, lineStart, lineEnd);
